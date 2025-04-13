@@ -13,16 +13,19 @@ const port = process.env.PORT || 3001;
 
 // CORS configuration
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',');
+console.log('Allowed Origins:', allowedOrigins); // Debug log
+
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps, curl, postman)
-    if (!origin) {
+    if (!origin || process.env.NODE_ENV === 'development') {
       return callback(null, true);
     }
-    
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.log('Blocked Origin:', origin); // Debug log
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -89,6 +92,9 @@ app.post('/api/connect', async (req, res) => {
         user,
         password,
         database,
+        ssl: {
+          rejectUnauthorized: false // Use true in production with proper SSL certificates
+        }
       });
       // Test the connection
       const client = await pgConnection.connect();
