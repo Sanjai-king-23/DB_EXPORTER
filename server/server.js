@@ -70,6 +70,7 @@ process.on('SIGINT', cleanup);
 app.post('/api/connect', async (req, res) => {
   try {
     const { type, host, port, user, password, database } = req.body;
+    console.log('Attempting to connect to database:', { type, host, port, database });
 
     // Close existing connections before creating new ones
     await cleanup();
@@ -84,7 +85,9 @@ app.post('/api/connect', async (req, res) => {
         connectTimeout: parseInt(process.env.REQUEST_TIMEOUT) || 30000
       });
       await mysqlConnection.connect();
+      console.log('Successfully connected to MySQL database');
     } else if (type === 'postgresql') {
+      console.log('Creating PostgreSQL connection pool...');
       pgConnection = new Pool({
         ...poolConfig,
         host,
@@ -97,8 +100,10 @@ app.post('/api/connect', async (req, res) => {
         }
       });
       // Test the connection
+      console.log('Testing PostgreSQL connection...');
       const client = await pgConnection.connect();
       client.release();
+      console.log('Successfully connected to PostgreSQL database');
     } else {
       throw new Error('Unsupported database type');
     }
@@ -118,6 +123,8 @@ app.post('/api/connect', async (req, res) => {
 app.get('/api/tables', async (req, res) => {
   try {
     const dbType = req.query.type;
+    console.log('Fetching tables for database type:', dbType);
+    console.log('Connection status - PostgreSQL:', !!pgConnection, 'MySQL:', !!mysqlConnection);
     
     if (!mysqlConnection && !pgConnection) {
       return res.status(400).json({ 
@@ -131,12 +138,14 @@ app.get('/api/tables', async (req, res) => {
       const [rows] = await mysqlConnection.query('SHOW TABLES');
       tables = rows.map(row => Object.values(row)[0]);
     } else if (dbType === 'postgresql' && pgConnection) {
+      console.log('Fetching PostgreSQL tables...');
       const { rows } = await pgConnection.query(
         "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
       );
       tables = rows.map(row => row.table_name);
+      console.log('Found tables:', tables);
     } else {
-      throw new Error('Invalid database type or no connection available');
+      throw new Error(`Invalid database type (${dbType}) or no connection available for that type`);
     }
 
     res.json({ success: true, tables });
